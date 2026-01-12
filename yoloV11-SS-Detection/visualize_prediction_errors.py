@@ -55,12 +55,14 @@ def load_ground_truth_from_txt(label_path, img_width, img_height):
 
 def visualize_predictions_with_error(model_path, val_images_dir, val_labels_dir,
                                      output_dir='runs/pose/visualize_errors',
-                                     conf_threshold=0.25, max_images=20):
+                                     conf_threshold=0.25, max_images=20,
+                                     images_per_category=5):
     """
     可视化预测结果，显示预测点、真实点和误差
+    按类别均衡采样，确保每个类别都有代表
     """
     print("=" * 80)
-    print("可视化预测结果和误差")
+    print("可视化预测结果和误差 (按类别均衡采样)")
     print("=" * 80)
 
     # 创建输出目录
@@ -78,16 +80,52 @@ def visualize_predictions_with_error(model_path, val_images_dir, val_labels_dir,
     val_images_path = Path(val_images_dir)
     val_labels_path = Path(val_labels_dir)
 
-    image_files = list(val_images_path.glob('*.jpg')) + list(val_images_path.glob('*.png'))
+    all_image_files = list(val_images_path.glob('*.jpg')) + list(val_images_path.glob('*.png'))
 
-    if len(image_files) == 0:
+    if len(all_image_files) == 0:
         print(f"错误: 未找到图片在 {val_images_dir}")
         return
 
-    # 限制处理数量
-    image_files = image_files[:max_images]
+    # 类别定义 (按长度降序排列，确保复合类别名先匹配)
+    CATEGORIES = sorted(['cataract', 'normal', 'glaucoma', 'glaucoma_cataract'], key=len, reverse=True)
 
-    print(f"\n处理 {len(image_files)} 张图片")
+    # 按类别分组
+    images_by_category = {cat: [] for cat in CATEGORIES}
+
+    for img_path in all_image_files:
+        img_name = img_path.stem
+        category = None
+        for cat in CATEGORIES:
+            if img_name.startswith(cat + '_'):
+                category = cat
+                break
+
+        if category is not None:
+            images_by_category[category].append(img_path)
+
+    # 打印各类别数量
+    print(f"\n各类别图片数量:")
+    for cat in CATEGORIES:
+        print(f"  {cat:20s}: {len(images_by_category[cat])} 张")
+
+    # 从每个类别中均衡采样
+    image_files = []
+    for cat in CATEGORIES:
+        available = images_by_category[cat]
+        if available:
+            # 取每个类别的前 images_per_category 张图片
+            sample_count = min(images_per_category, len(available))
+            image_files.extend(available[:sample_count])
+
+    # 如果总数不够 max_images，从剩余图片中补充
+    if len(image_files) < max_images:
+        remaining = max_images - len(image_files)
+        used = set(image_files)
+        available = [img for img in all_image_files if img not in used]
+        if available:
+            image_files.extend(available[:remaining])
+
+    print(f"\n选择可视化 {len(image_files)} 张图片 (每类 {images_per_category} 张)")
     print(f"输出目录: {output_path.absolute()}\n")
 
     keypoint_names = ['Left Scleral Spur', 'Right Scleral Spur']
@@ -219,13 +257,15 @@ def visualize_predictions_with_error(model_path, val_images_dir, val_labels_dir,
 
 
 def main():
-    # 配置
-    model_path = 'runs/pose/asoct_yolo11l/weights/best.pt'
+    # 配置 - 修改这里来切换模型
+    model_size = 'l'  # 可选: 'n', 's', 'm', 'l', 'x'
+    model_path = f'runs/pose/asoct_yolo11{model_size}_4class/weights/best.pt'
     val_images_dir = 'datasets/ASOCT_YOLO/images/val'
     val_labels_dir = 'datasets/ASOCT_YOLO/labels/val'
     output_dir = 'runs/pose/visualize_errors'
     conf_threshold = 0.25
-    max_images = 100  # 最多可视化50张图片
+    max_images = 40  # 最多可视化40张图片 (4类 × 10张/类)
+    images_per_category = 10  # 每个类别可视化10张图片
 
     # 检查路径
     if not Path(model_path).exists():
@@ -245,7 +285,8 @@ def main():
         val_labels_dir=val_labels_dir,
         output_dir=output_dir,
         conf_threshold=conf_threshold,
-        max_images=max_images
+        max_images=max_images,
+        images_per_category=images_per_category
     )
 
     print("\n说明:")
@@ -253,6 +294,7 @@ def main():
     print("  蓝色叉号: 模型预测 (Prediction)")
     print("  黄色连线: 预测误差")
     print("  黄色数字: 像素距离")
+    print(f"\n采样策略: 每个类别均衡采样 {images_per_category} 张图片")
 
 
 if __name__ == '__main__':

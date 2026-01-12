@@ -1,12 +1,12 @@
 """
 将LabelMe格式的AS-OCT标注数据转换为YOLOv11 Pose格式
-支持4个类别合并训练: Cataract, Normal, PACG, PACG_Cataract
+支持4个类别分类训练: Cataract, Normal, Glaucoma, Glaucoma_Cataract
 
 每个样本检测2个关键点:
 - left_scleral_spur (左侧巩膜突)
 - right_scleral_spur (右侧巩膜突)
 
-所有类别合并为单个类别 'asoct' 进行训练
+每个类别保持独立，不合并
 """
 
 import json
@@ -17,13 +17,20 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 
 # 配置
-CATEGORIES = ['Cataract', 'Normal', 'PACG', 'PACG_Cataract']
+CATEGORIES = ['Normal', 'Cataract', 'Glaucoma', 'Glaucoma_Cataract']
 SOURCE_BASE = "datasets"
 OUTPUT_DIR = "datasets/ASOCT_YOLO"
-TRAIN_RATIO = 0.8  # 80% 训练集, 20% 验证集
+TRAIN_RATIO = 0.85  # 85% 训练集, 15% 验证集
 
-# 定义类别(所有类别合并为一个)
-CLASSES = ["asoct"]  # 只有一个类别
+# 定义类别（四个独立类别）
+CLASSES = ["normal", "cataract", "glaucoma", "glaucoma_cataract"]
+# 类别ID映射
+CLASS_ID_MAP = {
+    'Normal': 0,
+    'Cataract': 1,
+    'Glaucoma': 2,
+    'Glaucoma_Cataract': 3
+}
 
 # 关键点名称映射
 KEYPOINT_LABELS = [
@@ -105,7 +112,7 @@ def get_bbox_from_polygons(json_data, img_width, img_height):
     return [x_center, y_center, width, height]
 
 
-def convert_labelme_to_yolo(json_path, img_width, img_height):
+def convert_labelme_to_yolo(json_path, img_width, img_height, category):
     """
     将单个LabelMe JSON转换为YOLO格式
     格式: <class> <x_center> <y_center> <width> <height> <kp1_x> <kp1_y> <kp1_v> <kp2_x> <kp2_y> <kp2_v>
@@ -123,8 +130,11 @@ def convert_labelme_to_yolo(json_path, img_width, img_height):
     # 获取关键点
     keypoints = extract_keypoints_from_json(json_data, img_w, img_h)
 
+    # 获取类别ID
+    class_id = CLASS_ID_MAP[category]
+
     # 组合为YOLO格式: class_id + bbox + keypoints
-    yolo_line = [0] + bbox + keypoints  # class_id=0 (所有类别统一为asoct)
+    yolo_line = [class_id] + bbox + keypoints
 
     # 格式化为字符串
     yolo_str = ' '.join([f'{x:.6f}' if isinstance(x, float) else str(x) for x in yolo_line])
@@ -150,15 +160,10 @@ def collect_all_files():
         json_files = list(label_dir.glob('*.json'))
 
         for json_file in json_files:
-            # 获取对应的图片文件
-            with open(json_file, 'r', encoding='utf-8') as f:
-                json_data = json.load(f)
-
-            img_name = json_data.get('imagePath', '')
-            if not img_name:
-                continue
-
-            img_path = image_dir / img_name
+            # 使用简单的数字ID来匹配图片
+            # 例如: 1.json -> 1.jpg, 327.json -> 327.jpg
+            json_stem = json_file.stem  # 获取不带扩展名的文件名 (如 "1", "327")
+            img_path = image_dir / f"{json_stem}.jpg"
 
             if img_path.exists():
                 all_files.append((json_file, img_path, category))
@@ -170,7 +175,7 @@ def collect_all_files():
 
 def main():
     print("=" * 70)
-    print("LabelMe to YOLOv11 Pose 数据转换工具 - 多类别合并版")
+    print("LabelMe to YOLOv11 Pose 数据转换工具 - 四类别独立版")
     print("=" * 70)
 
     # 创建输出目录
@@ -222,7 +227,8 @@ def main():
                 with open(json_file, 'r', encoding='utf-8') as f:
                     json_data = json.load(f)
 
-                img_name = json_data['imagePath']
+                # 使用实际的图片文件名，而不是JSON中的imagePath
+                img_name = img_path.name  # 例如: 1.jpg, 327.jpg
 
                 # 为避免不同类别的同名文件冲突,在文件名前加类别前缀
                 prefix = category.lower()
@@ -232,7 +238,7 @@ def main():
                 # 转换为YOLO格式
                 img_h = json_data.get('imageHeight', 1868)
                 img_w = json_data.get('imageWidth', 2135)
-                yolo_line = convert_labelme_to_yolo(json_file, img_w, img_h)
+                yolo_line = convert_labelme_to_yolo(json_file, img_w, img_h, category)
 
                 # 保存图片
                 output_img_path = output_path / 'images' / split_name / new_img_name
@@ -272,7 +278,10 @@ def main():
     print(f"  验证集: {val_success} 张")
 
     print(f"\n数据集信息:")
-    print(f"  类别数: 1 (asoct - 合并所有类别)")
+    print(f"  类别数: {len(CLASSES)}")
+    print(f"  类别列表:")
+    for i, (cat_name, class_name) in enumerate(zip(CATEGORIES, CLASSES)):
+        print(f"    {i}: {class_name} ({cat_name})")
     print(f"  关键点数: {len(KEYPOINT_LABELS)}")
     print(f"  关键点: {', '.join(KEYPOINT_LABELS)}")
 
@@ -284,7 +293,7 @@ def main():
     print("\n下一步:")
     print("1. 检查生成的数据: datasets/ASOCT_YOLO/")
     print("2. 使用配置文件: datasets/asoct-pose.yaml")
-    print("3. 开始训练: python train_pose.py")
+    print("3. 开始训练: python train_asoct_pose.py")
 
 
 if __name__ == '__main__':

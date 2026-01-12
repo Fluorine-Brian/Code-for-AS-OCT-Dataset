@@ -141,9 +141,14 @@ dmypy.json
 .pyre/
 
 # datasets and projects (ignore /datasets dir at root only to allow for docs/en/datasets dir)
-/datasets
+# 忽略数据文件但保留配置文件
+/datasets/**/*
+!/datasets/
+!/datasets/*.yaml
+asoct_dataset_cleaned
 runs/
 wandb/
+saves/
 .DS_Store
 
 # AS-OCT Project Specific -----------------------------------------------------------------------------------------------

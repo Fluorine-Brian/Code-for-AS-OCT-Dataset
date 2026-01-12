@@ -110,17 +110,32 @@ def evaluate_model(model_path, val_images_dir, val_labels_dir, conf_threshold=0.
     print(f"置信度阈值: {conf_threshold}")
     print("\n开始评估...\n")
 
-    # 统计数据
+    # 类别定义 (按长度降序排列，确保复合类别名先匹配)
+    CATEGORIES = sorted(['cataract', 'normal', 'glaucoma', 'glaucoma_cataract'], key=len, reverse=True)
+
+    # 统计数据 - 整体统计
     stats = {
         'left_scleral_spur': [],
         'right_scleral_spur': [],
         'all': []
     }
 
+    # 统计数据 - 按类别统计
+    stats_by_category = {
+        category: {
+            'left_scleral_spur': [],
+            'right_scleral_spur': [],
+            'all': []
+        }
+        for category in CATEGORIES
+    }
+
     keypoint_names = ['left_scleral_spur', 'right_scleral_spur']
 
     no_detection_count = 0
+    no_detection_by_category = {cat: 0 for cat in CATEGORIES}
     processed_count = 0
+    processed_by_category = {cat: 0 for cat in CATEGORIES}
 
     # 逐张图片评估
     for img_path in image_files:
@@ -129,6 +144,18 @@ def evaluate_model(model_path, val_images_dir, val_labels_dir, conf_threshold=0.
         label_path = val_labels_path / label_name
 
         if not label_path.exists():
+            continue
+
+        # 从文件名提取类别 (格式: category_originalname.jpg)
+        img_name = img_path.stem
+        category = None
+        for cat in CATEGORIES:
+            if img_name.startswith(cat + '_'):
+                category = cat
+                break
+
+        if category is None:
+            # 如果无法识别类别，跳过或归类为unknown
             continue
 
         # 读取图片尺寸
@@ -152,6 +179,7 @@ def evaluate_model(model_path, val_images_dir, val_labels_dir, conf_threshold=0.
         # 提取预测的关键点
         if len(results) == 0 or len(results[0].boxes) == 0:
             no_detection_count += 1
+            no_detection_by_category[category] += 1
             continue
 
         result = results[0]
@@ -159,6 +187,7 @@ def evaluate_model(model_path, val_images_dir, val_labels_dir, conf_threshold=0.
         # 获取第一个检测框的关键点
         if result.keypoints is None or len(result.keypoints) == 0:
             no_detection_count += 1
+            no_detection_by_category[category] += 1
             continue
 
         pred_keypoints_norm = result.keypoints.xy[0].cpu().numpy()  # [2, 2]
@@ -175,10 +204,16 @@ def evaluate_model(model_path, val_images_dir, val_labels_dir, conf_threshold=0.
                 distance = calculate_pixel_distance(pred_kp, gt_kp)
 
                 if distance is not None:
+                    # 整体统计
                     stats[kp_name].append(distance)
                     stats['all'].append(distance)
 
+                    # 按类别统计
+                    stats_by_category[category][kp_name].append(distance)
+                    stats_by_category[category]['all'].append(distance)
+
         processed_count += 1
+        processed_by_category[category] += 1
 
         if processed_count % 20 == 0:
             print(f"  已处理: {processed_count}/{len(image_files)}")
@@ -188,16 +223,26 @@ def evaluate_model(model_path, val_images_dir, val_labels_dir, conf_threshold=0.
     print("评估完成!")
     print("=" * 80)
 
-    print(f"\n处理统计:")
+    print(f"\n处理统计 (整体):")
     print(f"  总图片数: {len(image_files)}")
     print(f"  成功检测: {processed_count}")
     print(f"  未检测到: {no_detection_count}")
     print(f"  检测率: {processed_count / len(image_files) * 100:.1f}%")
 
-    # 计算并打印每个关键点的统计
-    print("\n" + "-" * 80)
-    print("关键点定位精度 (像素距离):")
+    # 打印各类别的处理统计
+    print(f"\n处理统计 (按类别):")
     print("-" * 80)
+    for category in CATEGORIES:
+        total_cat = processed_by_category[category] + no_detection_by_category[category]
+        if total_cat > 0:
+            detection_rate = processed_by_category[category] / total_cat * 100
+            print(f"  {category.upper():15s}: 总数 {total_cat:3d}, 检测 {processed_by_category[category]:3d}, "
+                  f"未检测 {no_detection_by_category[category]:2d}, 检测率 {detection_rate:.1f}%")
+
+    # 计算并打印整体统计
+    print("\n" + "=" * 80)
+    print("【整体评估】关键点定位精度 (像素距离):")
+    print("=" * 80)
 
     for kp_name in keypoint_names + ['all']:
         distances = stats[kp_name]
@@ -232,48 +277,162 @@ def evaluate_model(model_path, val_images_dir, val_labels_dir, conf_threshold=0.
         print(f"  PCK@20px: {pck_20:.1f}%")
         print(f"  PCK@50px: {pck_50:.1f}%")
 
+    # 计算并打印各类别的统计
+    print("\n" + "=" * 80)
+    print("【按类别评估】关键点定位精度 (像素距离):")
+    print("=" * 80)
+
+    for category in CATEGORIES:
+        cat_stats = stats_by_category[category]
+
+        # 只处理有数据的类别
+        if len(cat_stats['all']) == 0:
+            continue
+
+        print(f"\n--- {category.upper()} ---")
+
+        for kp_name in keypoint_names + ['all']:
+            distances = cat_stats[kp_name]
+
+            if len(distances) == 0:
+                continue
+
+            distances = np.array(distances)
+
+            mean_dist = np.mean(distances)
+            std_dist = np.std(distances)
+            median_dist = np.median(distances)
+            min_dist = np.min(distances)
+            max_dist = np.max(distances)
+
+            # PCK@Xpx
+            pck_5 = np.sum(distances <= 5) / len(distances) * 100
+            pck_10 = np.sum(distances <= 10) / len(distances) * 100
+            pck_20 = np.sum(distances <= 20) / len(distances) * 100
+            pck_50 = np.sum(distances <= 50) / len(distances) * 100
+
+            display_name = "整体" if kp_name == 'all' else kp_name
+
+            print(f"\n  {display_name}:")
+            print(f"    样本数量: {len(distances)}")
+            print(f"    平均距离 (MPD): {mean_dist:.2f} ± {std_dist:.2f} 像素")
+            print(f"    中位数距离: {median_dist:.2f} 像素")
+            print(f"    范围: [{min_dist:.2f}, {max_dist:.2f}] 像素")
+            print(f"    PCK@5px:  {pck_5:.1f}%  |  PCK@10px: {pck_10:.1f}%  |  PCK@20px: {pck_20:.1f}%  |  PCK@50px: {pck_50:.1f}%")
+
+    # 打印所有类别的对比汇总表
+    print("\n" + "=" * 80)
+    print("【类别对比汇总】")
+    print("=" * 80)
+
+    # 表头
+    print("\n类别性能对比表:")
+    print("-" * 120)
+    print(f"{'类别':15s} | {'样本数':>6s} | {'MPD':>8s} | {'中位数':>8s} | {'PCK@5px':>9s} | {'PCK@10px':>10s} | {'PCK@20px':>10s} | {'PCK@50px':>10s}")
+    print("-" * 120)
+
+    # 按类别输出汇总数据
+    for category in CATEGORIES:
+        if len(stats_by_category[category]['all']) == 0:
+            continue
+
+        distances = np.array(stats_by_category[category]['all'])
+        mean_dist = np.mean(distances)
+        median_dist = np.median(distances)
+        pck_5 = np.sum(distances <= 5) / len(distances) * 100
+        pck_10 = np.sum(distances <= 10) / len(distances) * 100
+        pck_20 = np.sum(distances <= 20) / len(distances) * 100
+        pck_50 = np.sum(distances <= 50) / len(distances) * 100
+
+        cat_display = category.upper().replace('_', ' ')
+        print(f"{cat_display:15s} | {len(distances):6d} | {mean_dist:7.2f}px | {median_dist:7.2f}px | "
+              f"{pck_5:8.1f}% | {pck_10:9.1f}% | {pck_20:9.1f}% | {pck_50:9.1f}%")
+
+    print("-" * 120)
+
+    # 输出整体数据
+    all_distances = np.array(stats['all'])
+    overall_mean = np.mean(all_distances)
+    overall_median = np.median(all_distances)
+    overall_pck5 = np.sum(all_distances <= 5) / len(all_distances) * 100
+    overall_pck10 = np.sum(all_distances <= 10) / len(all_distances) * 100
+    overall_pck20 = np.sum(all_distances <= 20) / len(all_distances) * 100
+    overall_pck50 = np.sum(all_distances <= 50) / len(all_distances) * 100
+
+    print(f"{'整体平均':15s} | {len(all_distances):6d} | {overall_mean:7.2f}px | {overall_median:7.2f}px | "
+          f"{overall_pck5:8.1f}% | {overall_pck10:9.1f}% | {overall_pck20:9.1f}% | {overall_pck50:9.1f}%")
+    print("-" * 120)
+
+    # 找出最佳和最差类别
+    category_mpds = []
+    for category in CATEGORIES:
+        if len(stats_by_category[category]['all']) > 0:
+            mpd = np.mean(stats_by_category[category]['all'])
+            category_mpds.append((category, mpd))
+
+    if category_mpds:
+        best_cat, best_mpd = min(category_mpds, key=lambda x: x[1])
+        worst_cat, worst_mpd = max(category_mpds, key=lambda x: x[1])
+
+        print(f"\n性能分析:")
+        print(f"  最佳类别: {best_cat.upper().replace('_', ' ')} (MPD: {best_mpd:.2f}px)")
+        print(f"  最差类别: {worst_cat.upper().replace('_', ' ')} (MPD: {worst_mpd:.2f}px)")
+        print(f"  性能差异: {worst_mpd - best_mpd:.2f}px")
+
     # 绘制距离分布图
     print("\n生成可视化图表...")
-    plot_distance_distribution(stats, keypoint_names)
+    plot_distance_distribution(stats, stats_by_category, keypoint_names)
 
-    return stats
+    return stats, stats_by_category
 
 
-def plot_distance_distribution(stats, keypoint_names):
+def plot_distance_distribution(stats, stats_by_category, keypoint_names):
     """
-    绘制距离分布图
+    绘制距离分布图（包含整体和按类别的可视化）
     """
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    # 类别定义 (按长度降序排列，确保复合类别名先匹配)
+    CATEGORIES = sorted(['cataract', 'normal', 'glaucoma', 'glaucoma_cataract'], key=len, reverse=True)
+
+    # 创建更大的画布，包含按类别的统计
+    fig = plt.figure(figsize=(18, 14))
+
+    # 使用GridSpec创建布局
+    import matplotlib.gridspec as gridspec
+    gs = gridspec.GridSpec(3, 3, figure=fig, hspace=0.3, wspace=0.3)
+
     fig.suptitle('AS-OCT Scleral Spur Keypoint Localization Error Distribution',
-                 fontsize=14, fontweight='bold')
+                 fontsize=16, fontweight='bold')
+
+    # ========== 第一行：整体统计 (原有的4个图) ==========
 
     # 1. 整体距离分布直方图
-    ax1 = axes[0, 0]
+    ax1 = fig.add_subplot(gs[0, 0])
     all_distances = np.array(stats['all'])
     ax1.hist(all_distances, bins=50, color='steelblue', alpha=0.7, edgecolor='black')
     ax1.axvline(np.mean(all_distances), color='red', linestyle='--',
                 label=f'Mean: {np.mean(all_distances):.2f}px')
     ax1.axvline(np.median(all_distances), color='green', linestyle='--',
                 label=f'Median: {np.median(all_distances):.2f}px')
-    ax1.set_xlabel('Pixel Distance (px)')
-    ax1.set_ylabel('Frequency')
-    ax1.set_title('Overall Distance Distribution')
-    ax1.legend()
+    ax1.set_xlabel('Pixel Distance (px)', fontsize=10)
+    ax1.set_ylabel('Frequency', fontsize=10)
+    ax1.set_title('Overall Distance Distribution', fontsize=11, fontweight='bold')
+    ax1.legend(fontsize=9)
     ax1.grid(True, alpha=0.3)
 
     # 2. 左右关键点对比箱线图
-    ax2 = axes[0, 1]
+    ax2 = fig.add_subplot(gs[0, 1])
     data_to_plot = [stats[kp] for kp in keypoint_names if len(stats[kp]) > 0]
     labels = [kp.replace('_', ' ').title() for kp in keypoint_names if len(stats[kp]) > 0]
     bp = ax2.boxplot(data_to_plot, labels=labels, patch_artist=True)
     for patch in bp['boxes']:
         patch.set_facecolor('lightblue')
-    ax2.set_ylabel('Pixel Distance (px)')
-    ax2.set_title('Left vs Right Scleral Spur')
+    ax2.set_ylabel('Pixel Distance (px)', fontsize=10)
+    ax2.set_title('Left vs Right Scleral Spur', fontsize=11, fontweight='bold')
     ax2.grid(True, alpha=0.3)
+    ax2.tick_params(axis='x', labelsize=9)
 
     # 3. PCK曲线
-    ax3 = axes[1, 0]
+    ax3 = fig.add_subplot(gs[0, 2])
     thresholds = np.arange(0, 101, 1)
 
     for kp_name in keypoint_names:
@@ -286,34 +445,118 @@ def plot_distance_distribution(stats, keypoint_names):
         label = kp_name.replace('_', ' ').title()
         ax3.plot(thresholds, pck_values, marker='o', markersize=2, label=label)
 
-    ax3.set_xlabel('Distance Threshold (px)')
-    ax3.set_ylabel('PCK (%)')
-    ax3.set_title('PCK Curve (Percentage of Correct Keypoints)')
-    ax3.legend()
+    ax3.set_xlabel('Distance Threshold (px)', fontsize=10)
+    ax3.set_ylabel('PCK (%)', fontsize=10)
+    ax3.set_title('PCK Curve', fontsize=11, fontweight='bold')
+    ax3.legend(fontsize=9)
     ax3.grid(True, alpha=0.3)
     ax3.set_xlim([0, 100])
     ax3.set_ylim([0, 105])
 
-    # 4. 累积分布函数 (CDF)
-    ax4 = axes[1, 1]
-    for kp_name in keypoint_names + ['all']:
-        if len(stats[kp_name]) == 0:
+    # ========== 第二行：按类别的箱线图对比 ==========
+
+    # 4. 各类别整体距离箱线图
+    ax4 = fig.add_subplot(gs[1, :])
+    category_data = []
+    category_labels = []
+    colors = ['#ff9999', '#66b3ff', '#99ff99', '#ffcc99']
+
+    for i, category in enumerate(CATEGORIES):
+        if len(stats_by_category[category]['all']) > 0:
+            category_data.append(stats_by_category[category]['all'])
+            category_labels.append(category.upper().replace('_', ' '))
+
+    if category_data:
+        bp = ax4.boxplot(category_data, labels=category_labels, patch_artist=True, showfliers=True)
+        for patch, color in zip(bp['boxes'], colors[:len(category_data)]):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.7)
+
+        ax4.set_ylabel('Pixel Distance (px)', fontsize=11)
+        ax4.set_title('Distance Distribution by Category', fontsize=12, fontweight='bold')
+        ax4.grid(True, alpha=0.3, axis='y')
+        ax4.tick_params(axis='x', labelsize=10)
+
+        # 添加统计信息
+        for i, (data, label) in enumerate(zip(category_data, category_labels)):
+            mean_val = np.mean(data)
+            ax4.text(i+1, mean_val, f'{mean_val:.1f}', ha='center', va='bottom', fontsize=8, fontweight='bold')
+
+    # ========== 第三行：各类别的PCK对比 ==========
+
+    # 5. 各类别PCK@10px条形图
+    ax5 = fig.add_subplot(gs[2, 0])
+    pck10_values = []
+    pck10_labels = []
+
+    for category in CATEGORIES:
+        if len(stats_by_category[category]['all']) > 0:
+            distances = np.array(stats_by_category[category]['all'])
+            pck10 = np.sum(distances <= 10) / len(distances) * 100
+            pck10_values.append(pck10)
+            pck10_labels.append(category.upper().replace('_', '\n'))
+
+    if pck10_values:
+        bars = ax5.bar(range(len(pck10_values)), pck10_values, color=colors[:len(pck10_values)], alpha=0.7, edgecolor='black')
+        ax5.set_xticks(range(len(pck10_labels)))
+        ax5.set_xticklabels(pck10_labels, fontsize=9)
+        ax5.set_ylabel('PCK@10px (%)', fontsize=10)
+        ax5.set_title('PCK@10px by Category', fontsize=11, fontweight='bold')
+        ax5.grid(True, alpha=0.3, axis='y')
+        ax5.set_ylim([0, 105])
+
+        # 在柱子上显示数值
+        for bar, val in zip(bars, pck10_values):
+            height = bar.get_height()
+            ax5.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{val:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+    # 6. 各类别MPD条形图
+    ax6 = fig.add_subplot(gs[2, 1])
+    mpd_values = []
+    mpd_labels = []
+
+    for category in CATEGORIES:
+        if len(stats_by_category[category]['all']) > 0:
+            mpd = np.mean(stats_by_category[category]['all'])
+            mpd_values.append(mpd)
+            mpd_labels.append(category.upper().replace('_', '\n'))
+
+    if mpd_values:
+        bars = ax6.bar(range(len(mpd_values)), mpd_values, color=colors[:len(mpd_values)], alpha=0.7, edgecolor='black')
+        ax6.set_xticks(range(len(mpd_labels)))
+        ax6.set_xticklabels(mpd_labels, fontsize=9)
+        ax6.set_ylabel('Mean Pixel Distance (px)', fontsize=10)
+        ax6.set_title('MPD by Category', fontsize=11, fontweight='bold')
+        ax6.grid(True, alpha=0.3, axis='y')
+
+        # 在柱子上显示数值
+        for bar, val in zip(bars, mpd_values):
+            height = bar.get_height()
+            ax6.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{val:.1f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+    # 7. 各类别PCK曲线对比
+    ax7 = fig.add_subplot(gs[2, 2])
+    thresholds = np.arange(0, 101, 2)
+
+    for i, category in enumerate(CATEGORIES):
+        if len(stats_by_category[category]['all']) == 0:
             continue
 
-        distances = np.array(sorted(stats[kp_name]))
-        cdf = np.arange(1, len(distances) + 1) / len(distances) * 100
+        distances = np.array(stats_by_category[category]['all'])
+        pck_values = [np.sum(distances <= t) / len(distances) * 100 for t in thresholds]
 
-        label = "Overall" if kp_name == 'all' else kp_name.replace('_', ' ').title()
-        ax4.plot(distances, cdf, label=label, linewidth=2)
+        ax7.plot(thresholds, pck_values, marker='o', markersize=3,
+                label=category.upper(), color=colors[i], linewidth=2, alpha=0.8)
 
-    ax4.set_xlabel('Pixel Distance (px)')
-    ax4.set_ylabel('Cumulative Percentage (%)')
-    ax4.set_title('Cumulative Distribution Function (CDF)')
-    ax4.legend()
-    ax4.grid(True, alpha=0.3)
-    ax4.set_xlim([0, 100])
-
-    plt.tight_layout()
+    ax7.set_xlabel('Distance Threshold (px)', fontsize=10)
+    ax7.set_ylabel('PCK (%)', fontsize=10)
+    ax7.set_title('PCK Curves by Category', fontsize=11, fontweight='bold')
+    ax7.legend(fontsize=9, loc='lower right')
+    ax7.grid(True, alpha=0.3)
+    ax7.set_xlim([0, 100])
+    ax7.set_ylim([0, 105])
 
     # 保存图表
     save_path = 'runs/pose/evaluation_results.png'
@@ -324,8 +567,9 @@ def plot_distance_distribution(stats, keypoint_names):
 
 
 def main():
-    # 配置
-    model_path = 'runs/pose/asoct_yolo11x/weights/best.pt'
+    # 配置 - 修改这里来切换模型
+    model_size = 'l'  # 可选: 'n', 's', 'm', 'l', 'x'
+    model_path = f'runs/pose/asoct_yolo11{model_size}_4class/weights/best.pt'
     val_images_dir = 'datasets/ASOCT_YOLO/images/val'
     val_labels_dir = 'datasets/ASOCT_YOLO/labels/val'
     conf_threshold = 0.25  # 置信度阈值
