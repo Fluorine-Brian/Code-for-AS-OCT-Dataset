@@ -1,6 +1,6 @@
-# An Annotated AS-OCT Dataset for Multi-Disease Analysis and Ophthalmic Biometry
+# AS-OCT dataset with anatomical structure segmentation and scleral spur localization in cataract and glaucoma
 
-This project provides the official dataset and benchmark models for our paper, "An Annotated AS-OCT Dataset of Anterior Segment Structures for Multi-Disease Analysis and Ophthalmic Biometry."
+This project provides the official dataset and benchmark models for our paper, ["AS-OCT dataset with anatomical structure segmentation and scleral spur localization in cataract and glaucoma"](https://doi.org/10.1038/s41597-026-08315-8), published in *Scientific Data* (2026).
 
 Anterior Segment Optical Coherence Tomography (AS-OCT) is essential for modern ophthalmology, providing high-resolution visualization of the anterior eye for diagnosis, surgical planning, and biometric measurement. However, the development of automated analysis tools has been limited by a lack of high-quality, comprehensively annotated public datasets.
 
@@ -425,6 +425,28 @@ Pre-trained weights will be automatically downloaded during the first training r
    cd ..
    ```
 
+#### 巩膜突定位权重下载
+
+从百度网盘下载 `AS-OCT/yolov11l/best.pt`（YOLO11l-pose，Ultralytics 8.3.226，用于左右巩膜突定位）。**下载链接：[AS-OCT](https://pan.baidu.com/s/181n5k-KSRUKdenJ6_y7WaA)，提取码：`1234`。**
+
+按前文原有说明安装环境后，将权重和待预测图片放到原脚本默认目录（目录不存在时自行创建）：
+
+```text
+yoloV11-SS-Detection/runs/pose/asoct_yolo11l_4class/weights/best.pt
+yoloV11-SS-Detection/datasets/ASOCT_YOLO/images/val/  ← 待预测图片
+```
+
+然后在仓库根目录执行，无需重新训练：
+
+```bash
+cd yoloV11-SS-Detection
+python predict_asoct_pose.py
+```
+
+预测参数沿用原脚本：`imgsz=640`、`conf=0.25`、`iou=0.7`，自动选择 GPU 或 CPU；结果保存在 `runs/pose/predict/`。如需使用其他图片路径，修改原脚本中的 `source` 即可。
+
+对应的[数据集配置文件](yoloV11-SS-Detection/datasets/asoct-pose-4class.yaml)随仓库提供；仅预测时无需使用该文件。
+
 ## Evaluation
 
 For **segmentation models**, performance is measured using **Intersection over Union (IoU)** and **Dice Coefficient**. For **nnUNetv2**, the `iou_dice_calculate.py` script provides detailed metrics including mean, standard deviation, and variance.
@@ -524,13 +546,20 @@ This project integrates and builds upon several excellent open-source projects. 
 If you use this repository in your work, please also cite our paper:
 
 ```bibtex
-@article{your_paper_citation,
-  title={An Annotated AS-OCT Dataset of Anterior Segment Structures for Multi-Disease Analysis and Ophthalmic Biometry},
-  author={Your Name and Co-authors},
-  journal={Journal Name},
-  year={Year}
+@article{zhao2026asoct,
+  title={{AS-OCT} dataset with anatomical structure segmentation and scleral spur localization in cataract and glaucoma},
+  author={Zhao, Jiongning and Fang, Huihui and Yang, Yuetong and Fu, Xinyu and
+          Deng, Jingru and Yu, Jinghe and Yan, Xingying and Hu, Xinya and
+          Wang, Xiaoqing and Hu, Yuting and Gong, Di and Zhang, Zhe and
+          Chi, Wei and Yang, Weihua and Xu, Yanwu},
+  journal={Scientific Data},
+  year={2026},
+  doi={10.1038/s41597-026-08315-8},
+  url={https://doi.org/10.1038/s41597-026-08315-8}
 }
 ```
+
+Jiongning Zhao and Huihui Fang contributed equally to this work.
 
 ## License
 

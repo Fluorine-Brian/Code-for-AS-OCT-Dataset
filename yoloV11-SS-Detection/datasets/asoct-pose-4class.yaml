@@ -1,0 +1,35 @@
+# AS-OCT Pose Detection Dataset - 4 Classes
+# Anterior Segment OCT with scleral spur keypoint detection
+# 4 independent classes: Normal, Cataract, Glaucoma, Glaucoma_Cataract
+
+# Train/val/test sets
+path: datasets/ASOCT_YOLO  # dataset root dir
+train: images/train  # train images (relative to 'path')
+val: images/val  # val images (relative to 'path')
+test:  # test images (optional)
+
+# Keypoints
+kpt_shape: [2, 3]  # 2 keypoints, 3 dims (x, y, visibility)
+flip_idx: [1, 0]  # swap left and right scleral spur when flipping
+
+# Classes - 4 independent categories
+names:
+  0: normal
+  1: cataract
+  2: glaucoma
+  3: glaucoma_cataract
+
+# Keypoint names per class (same keypoints for all classes)
+kpt_names:
+  0:
+    - left_scleral_spur
+    - right_scleral_spur
+  1:
+    - left_scleral_spur
+    - right_scleral_spur
+  2:
+    - left_scleral_spur
+    - right_scleral_spur
+  3:
+    - left_scleral_spur
+    - right_scleral_spur
