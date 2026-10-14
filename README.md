@@ -6,7 +6,7 @@ Anterior Segment Optical Coherence Tomography (AS-OCT) is essential for modern o
 
 To address this gap, this repository presents a curated AS-OCT dataset of 848 images from 488 unique individuals across four clinical categories: normal, cataract, glaucoma, and co-occurrence conditions. Each image underwent strict quality control, and the dataset features comprehensive expert annotations, including segmentation masks for the anterior chamber, iris, lens, and nucleus, as well as localization points for scleral spurs. A key methodological strength is the "one-image-per-patient" design, which ensures subject independence and prevents data leakage, providing a robust foundation for building truly generalizable AI models.
 
-This repository contains the code to reproduce our benchmark results using three state-of-the-art segmentation models (**TRANSRESUNET**, **MEDSAM**, **nnUNetv2**) and one keypoint detection model (**YOLOv11 Pose**).
+This repository contains the code to reproduce our benchmark results using three state-of-the-art segmentation models (**TRANSRESUNET**, **MEDSAM**, **nnUNetv2**), one keypoint detection model (**YOLOv11 Pose**), and two classification models (**ResNet50**, **Vision Transformer**) for automated multi-disease classification across four clinical categories: Normal, Cataract, Glaucoma, and Glaucoma_Cataract.
 
 ## Project Workflow
 
@@ -24,23 +24,31 @@ The overall workflow for dataset creation and model validation is illustrated be
   - [MEDSAM](#medsam)
   - [nnUNetv2](#nnunetv2)
   - [YOLOv11 Pose](#yolov11-pose)
+  - [ResNet50](#resnet50)
+  - [Vision Transformer (ViT)](#vision-transformer-vit)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation for TransResUNet, MedSAM](#installation-for-transresunet-medsam)
   - [Installation for nnUNetv2 (Separate Environment)](#installation-for-nnunetv2-separate-environment)
   - [Installation for YOLOv11 Pose (Separate Environment)](#installation-for-yolov11-pose-separate-environment)
+  - [Installation for Classification Models (Separate Environment)](#installation-for-classification-models-separate-environment)
 - [Dataset Preparation](#dataset-preparation)
   - [Unified Raw Data Structure](#unified-raw-data-structure)
   - [Common Segmentation Dataset Preparation (for TransResUNet, MedSAM)](#common-segmentation-dataset-preparation-for-transresunet-medsam)
   - [nnUNetv2 Specific Dataset Preparation](#nnunetv2-specific-dataset-preparation)
   - [YOLOv11 Pose Specific Dataset Preparation](#yolov11-pose-specific-dataset-preparation)
+  - [Classification Dataset Preparation](#classification-dataset-preparation)
 - [Usage](#usage)
   - [1. TRANSRESUNET Workflow](#1-transresunet-workflow)
   - [2. MEDSAM Workflow](#2-medsam-workflow)
   - [3. nnUNetv2 Workflow](#3-nnunetv2-workflow)
   - [4. YOLOv11 Pose Workflow](#4-yolov11-pose-workflow)
+  - [5. Classification Workflow](#5-classification-workflow)
 - [Evaluation](#evaluation)
 - [Results](#results)
+  - [Segmentation Results](#segmentation-results)
+  - [Scleral Spur Localization Results](#scleral-spur-localization-results)
+  - [Classification Results](#classification-results)
 - [Attribution and Citation](#attribution-and-citation)
 - [License](#license)
 
@@ -55,6 +63,14 @@ The overall workflow for dataset creation and model validation is illustrated be
 │   ├── ...
 ├── MedSAM/                    # MedSAM segmentation code
 ├── TransResUnet/              # TransResUNet segmentation code
+├── ResNet50_Classification/   # ResNet50 classification code
+│   ├── train.py
+│   ├── test.py
+│   ├── pth/                   # Model checkpoints
+│   └── results/               # Evaluation results
+├── ViT_Classification/        # Vision Transformer classification code
+│   ├── vit.py                 # Training and testing script
+│   └── best_model.pt          # Best model checkpoint
 ├── processing_data.py         # Custom script for TransResUNet/MedSAM data preparation
 ├── png_to_nii.gz.py           # Custom script for nnUNetv2 data conversion
 ├── generate_json.py           # Custom script for nnUNetv2 dataset.json generation
@@ -96,13 +112,22 @@ The **nnUNetv2** is a self-configuring framework that automatically handles data
 
 The **YOLOv11 Pose** model is a state-of-the-art pose estimation model adapted here for keypoint detection. It enables the automatic localization of critical anatomical landmarks like the left and right scleral spurs in AS-OCT images.
 
+### ResNet50
+
+The **ResNet50** is a deep convolutional neural network with 50 layers that uses residual connections to enable effective training of very deep networks. In this project, it serves as a standard CNN baseline for multi-disease classification, leveraging ImageNet pre-trained weights and transfer learning to achieve robust performance on AS-OCT images. The model is fine-tuned on the last residual block (layer4) and fully connected layer to classify images into four categories: Normal, Cataract, Glaucoma, and Glaucoma_Cataract.
+
+### Vision Transformer (ViT)
+
+The **Vision Transformer (ViT)** is a Transformer-based architecture that treats images as sequences of patches, applying self-attention mechanisms to capture global context and long-range dependencies. Implemented using the `timm` library with the `vit_small_patch16_224` variant, this model demonstrates the effectiveness of pure attention-based architectures for medical image classification. It utilizes transfer learning from ImageNet pre-training to optimize performance on the AS-OCT multi-disease classification task.
+
 ## Getting Started
 
-**Note that TransResUNet and MedSAM share one environment, while nnUNetv2 and YOLOv11 Pose each require separate, dedicated environments due to their specific dependencies and Python version requirements.**
+**Note that TransResUNet and MedSAM share one environment, while nnUNetv2, YOLOv11 Pose, and Classification models each require separate, dedicated environments due to their specific dependencies and Python version requirements.**
 
 ### Prerequisites
 
 - Python 3.8+ (for TransResUNet, MedSAM)
+- Python 3.9+ (for Classification Models)
 - Python 3.10 (for nnUNetv2)
 - Python 3.11 (for YOLOv11 Pose)
 - Conda or another virtual environment manager
@@ -193,6 +218,29 @@ The **YOLOv11 Pose** model is a state-of-the-art pose estimation model adapted h
    pip install scikit-learn matplotlib
    cd ..
    ```
+
+### Installation for Classification Models (Separate Environment)
+
+1. **Create and activate a dedicated Conda environment for Classification:**
+
+   ```bash
+   conda create -n as-oct-cls python=3.9 -y
+   conda activate as-oct-cls
+   ```
+
+2. **Install PyTorch with CUDA support:**
+
+   ```bash
+   pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu118
+   ```
+
+3. **Install other dependencies:**
+
+   ```bash
+   pip install timm scikit-learn matplotlib seaborn pillow numpy tqdm
+   ```
+
+   **Note:** The `timm` library is required for Vision Transformer (ViT) implementation.
 
 ## Dataset Preparation
 
@@ -324,6 +372,51 @@ cd ..
 **Step 2: Pre-trained Weights (Optional)**
 Pre-trained weights will be automatically downloaded during the first training run.
 
+### Classification Dataset Preparation
+
+The classification task uses a **subject-independent** data split strategy to prevent data leakage and ensure robust model generalization. The dataset comprises **848 AS-OCT images** from 488 unique individuals across four clinical categories:
+
+- **Normal**: Healthy anterior segment without pathology
+- **Cataract**: Lens opacity affecting transparency
+- **Glaucoma**: Elevated intraocular pressure with characteristic anatomical changes
+- **Glaucoma_Cataract**: Co-occurrence of both conditions
+
+**Data Split Strategy:**
+The dataset is divided using a strict **one-image-per-patient** principle with the following ratios:
+- **Training Set**: 70% of images
+- **Validation Set**: 15% of images
+- **Test Set**: 15% of images
+
+This ensures that all images from a single patient are grouped into the same split (train, validation, or test), preventing information leakage and providing a realistic evaluation of model generalization to unseen patients.
+
+**Dataset Structure:**
+The raw data should be organized as follows:
+
+```
+raw_data/as-oct dataset/
+├── Cataract/
+│   └── Original Images/
+│       ├── image1.jpg
+│       ├── image2.jpg
+│       └── ...
+├── Normal/
+│   └── Original Images/
+│       └── ...
+├── Glaucoma/
+│   └── Original Images/
+│       └── ...
+└── Glaucoma_Cataract/
+    └── Original Images/
+        └── ...
+```
+
+**Preprocessing:**
+Both ResNet50 and ViT models apply the following transformations:
+- **Training**: Resize to 224×224, random horizontal flip, random rotation (±15°), ImageNet normalization
+- **Validation/Testing**: Resize to 224×224 (or 256 with center crop), ImageNet normalization
+
+**Note:** The data splitting is handled automatically within the training scripts (`train.py` and `vit.py`) using stratified sampling to maintain class balance across splits.
+
 ## Usage
 
 ### 1. TRANSRESUNET Workflow
@@ -425,11 +518,85 @@ Pre-trained weights will be automatically downloaded during the first training r
    cd ..
    ```
 
+### 5. Classification Workflow
+
+**Prerequisite:** Complete Classification Models installation.
+
+**Important:** Before running the classification scripts, you need to update the data path in the training scripts to point to your local dataset location.
+
+1. **Train ResNet50 Model:**
+
+   Open `ResNet50_Classification/train.py` and modify the `DATA_ROOT` variable to your dataset path:
+   ```python
+   DATA_ROOT = '/path/to/your/raw_data/as-oct dataset'
+   ```
+
+   Then train the model:
+   ```bash
+   conda activate as-oct-cls
+   cd ResNet50_Classification/
+   python train.py
+   cd ..
+   ```
+
+   This will:
+   - Automatically split the dataset (70% train, 15% validation, 15% test)
+   - Train ResNet50 with ImageNet pre-trained weights
+   - Save the best model to `pth/asoct/best_model.pth`
+   - Save test set paths to `pth/asoct/test_paths.txt`
+
+2. **Evaluate ResNet50 Model:**
+
+   ```bash
+   conda activate as-oct-cls
+   cd ResNet50_Classification/
+   python test.py
+   cd ..
+   ```
+
+   This will:
+   - Load the best trained model
+   - Evaluate on the test set
+   - Generate confusion matrix, ROC curves, and PR curves
+   - Save visualization results to `results/asoct/`
+
+3. **Train and Test Vision Transformer (ViT):**
+
+   Open `ViT_Classification/vit.py` and modify the `data_root` variable:
+   ```python
+   data_root = '/path/to/your/raw_data/as-oct dataset'
+   ```
+
+   Then run:
+   ```bash
+   conda activate as-oct-cls
+   cd ViT_Classification/
+   python vit.py
+   cd ..
+   ```
+
+   This script performs both training and testing:
+   - Trains ViT-Small model with ImageNet pre-trained weights
+   - Automatically splits the dataset (70% train, 15% validation, 15% test)
+   - Saves the best model to `best_model.pt`
+   - Evaluates on test set and prints classification report
+
 ## Evaluation
 
 For **segmentation models**, performance is measured using **Intersection over Union (IoU)** and **Dice Coefficient**. For **nnUNetv2**, the `iou_dice_calculate.py` script provides detailed metrics including mean, standard deviation, and variance.
 
 For **YOLOv11 Pose detection**, evaluation metrics include **mAP50-95 (pose)**, **Mean Pixel Distance (MPD)**, and **Percentage of Correct Keypoints (PCK)**.
+
+For **classification models**, performance is evaluated using multiple metrics to provide comprehensive assessment:
+- **Accuracy**: Overall classification correctness
+- **Precision**: Per-class and weighted average precision
+- **Recall**: Per-class and weighted average recall
+- **F1-Score**: Harmonic mean of precision and recall
+- **Confusion Matrix**: Visual representation of classification results
+- **ROC Curves**: Receiver Operating Characteristic curves with AUC scores for each class
+- **PR Curves**: Precision-Recall curves for each class
+
+The classification evaluation scripts generate detailed reports and visualizations saved to the `results/` directory.
 
 ## Results
 
@@ -459,6 +626,35 @@ For **YOLOv11 Pose detection**, evaluation metrics include **mAP50-95 (pose)**, 
 | :---- | :------------- | :---------- | :------ | :------- | :------- | :------- |
 | Left  | 41.39 ± 23.47  | 39.53       | 1.4%    | 3.5%     | 32.5%    | 69.2%    |
 | Right | 34.53 ± 110.50 | 22.98       | 6.2%    | 16.0%    | 41.7%    | 90.3%    |
+
+### Classification Results
+
+The classification models were evaluated on the test set (15% of 848 images) using a strict subject-independent split to ensure no patient overlap between training and testing sets.
+
+| Model     | Accuracy (%) | Precision (%) | Recall (%) | F1-Score (%) | Training Strategy                          |
+| :-------- | :----------- | :------------ | :--------- | :----------- | :----------------------------------------- |
+| ResNet50  | 85.03%       | 85.35%        | 85.03%     | 85.17%       | ImageNet pretrained, fine-tune layer4 + FC |
+| ViT-Small | TBD          | TBD           | TBD        | TBD          | ImageNet pretrained, full model fine-tune  |
+
+**Per-Class Performance (ResNet50):**
+
+| Class             | Precision (%) | Recall (%) | F1-Score (%) | Support |
+| :---------------- | :------------ | :--------- | :----------- | :------ |
+| Normal            | 1.0000        | 1.0000     | 1.0000       | 50      |
+| Cataract          | 0.9062        | 0.8788     | 0.8923       | 66      |
+| Glaucoma          | 0.6400        | 0.6957     | 0.6667       | 23      |
+| Glaucoma_Cataract | 0.6429        | 0.6429     | 0.6429       | 28      |
+
+**Per-Class Performance (ViT-Small):**
+
+| Class              | Precision (%) | Recall (%) | F1-Score (%) | Support |
+| :----------------- | :------------ | :--------- | :----------- | :------ |
+| Normal             | TBD           | TBD        | TBD          | TBD     |
+| Cataract           | TBD           | TBD        | TBD          | TBD     |
+| Glaucoma           | TBD           | TBD        | TBD          | TBD     |
+| Glaucoma_Cataract  | TBD           | TBD        | TBD          | TBD     |
+
+**Note:** TBD = To Be Determined. Please run the training and evaluation scripts to populate these results with your experimental data.
 
 ## Attribution and Citation
 
@@ -519,6 +715,38 @@ This project integrates and builds upon several excellent open-source projects. 
 
   *   GitHub Repository: [https://github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)
   *   (Please refer to their official documentation for the most up-to-date citation guidelines)
+
+* **PyTorch Image Models (timm):**
+
+  *   GitHub Repository: [https://github.com/huggingface/pytorch-image-models](https://github.com/huggingface/pytorch-image-models)
+  *   Used for Vision Transformer (ViT) implementation
+
+* **ResNet:**
+
+  *   Original Paper:
+
+    ```bibtex
+    @inproceedings{he2016deep,
+      title={Deep residual learning for image recognition},
+      author={He, Kaiming and Zhang, Xiangyu and Ren, Shaoqing and Sun, Jian},
+      booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+      pages={770--778},
+      year={2016}
+    }
+    ```
+
+* **Vision Transformer (ViT):**
+
+  *   Original Paper:
+
+    ```bibtex
+    @inproceedings{dosovitskiy2021an,
+      title={An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale},
+      author={Dosovitskiy, Alexey and Beyer, Lucas and Kolesnikov, Alexander and Weissenborn, Dirk and Zhai, Xiaohua and Unterthiner, Thomas and Dehghani, Mostafa and Minderer, Matthias and Heigold, Georg and Gelly, Sylvain and others},
+      booktitle={International Conference on Learning Representations},
+      year={2021}
+    }
+    ```
 
 **Our Paper:**
 If you use this repository in your work, please also cite our paper:
