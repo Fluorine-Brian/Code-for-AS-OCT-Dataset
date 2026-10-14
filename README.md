@@ -1,6 +1,6 @@
-# An Annotated AS-OCT Dataset for Multi-Disease Analysis and Ophthalmic Biometry
+# AS-OCT dataset with anatomical structure segmentation and scleral spur localization in cataract and glaucoma
 
-This project provides the official dataset and benchmark models for our paper, "An Annotated AS-OCT Dataset of Anterior Segment Structures for Multi-Disease Analysis and Ophthalmic Biometry."
+This project provides the official dataset and benchmark models for our paper, [&#34;AS-OCT dataset with anatomical structure segmentation and scleral spur localization in cataract and glaucoma&#34;](https://doi.org/10.1038/s41597-026-08315-8), published in *Scientific Data* (2026).
 
 Anterior Segment Optical Coherence Tomography (AS-OCT) is essential for modern ophthalmology, providing high-resolution visualization of the anterior eye for diagnosis, surgical planning, and biometric measurement. However, the development of automated analysis tools has been limited by a lack of high-quality, comprehensively annotated public datasets.
 
@@ -142,21 +142,18 @@ The **Vision Transformer (ViT)** is a Transformer-based architecture that treats
    git clone https://github.com/your-username/your-repo-name.git
    cd your-repo-name
    ```
-
 2. **Create and activate a Conda environment:**
 
    ```bash
    conda create --name as-oct-seg python=3.9
    conda activate as-oct-seg
    ```
-
 3. **Install the required dependencies:**
 
    ```bash
    pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu118
    pip install -r requirements.txt
    ```
-
 4. **Install LabelMe for data annotation and processing:**
    **Note:** The `processing_data.py` script relies on `labelme`. Please ensure it is installed.
 
@@ -172,14 +169,12 @@ The **Vision Transformer (ViT)** is a Transformer-based architecture that treats
    conda create -n nnunetv2_env python=3.10
    conda activate nnunetv2_env
    ```
-
 2. **Install nnUNetv2 and its dependencies:**
 
    ```bash
    pip install nnunetv2
    pip install nibabel numpy SimpleITK Pillow tqdm
    ```
-
 3. **Configure nnUNetv2 Environment Variables:**
    nnUNetv2 relies on three environment variables. **You must set these to absolute paths on your system.**
 
@@ -188,7 +183,7 @@ The **Vision Transformer (ViT)** is a Transformer-based architecture that treats
    export nnUNet_raw="/path/to/your/project/root/OUTPUT_FOLDER/nnUNet_raw"
    export nnUNet_preprocessed="/path/to/your/project/root/OUTPUT_FOLDER/nnUNet_preprocessed"
    export nnUNet_results="/path/to/your/project/root/OUTPUT_FOLDER/nnUNet_results"
-   
+
    # Create these directories if they don't exist
    mkdir -p $nnUNet_raw
    mkdir -p $nnUNet_preprocessed
@@ -203,13 +198,11 @@ The **Vision Transformer (ViT)** is a Transformer-based architecture that treats
    conda create -n yolo11 python=3.11 -y
    conda activate yolo11
    ```
-
 2. **Install PyTorch with CUDA support:**
 
    ```bash
    conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia -y
    ```
-
 3. **Install Ultralytics and other dependencies:**
 
    ```bash
@@ -227,13 +220,11 @@ The **Vision Transformer (ViT)** is a Transformer-based architecture that treats
    conda create -n as-oct-cls python=3.9 -y
    conda activate as-oct-cls
    ```
-
 2. **Install PyTorch with CUDA support:**
 
    ```bash
    pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu118
    ```
-
 3. **Install other dependencies:**
 
    ```bash
@@ -383,6 +374,7 @@ The classification task uses a **subject-independent** data split strategy to pr
 
 **Data Split Strategy:**
 The dataset is divided using a strict **one-image-per-patient** principle with the following ratios:
+
 - **Training Set**: 70% of images
 - **Validation Set**: 15% of images
 - **Test Set**: 15% of images
@@ -412,6 +404,7 @@ raw_data/as-oct dataset/
 
 **Preprocessing:**
 Both ResNet50 and ViT models apply the following transformations:
+
 - **Training**: Resize to 224×224, random horizontal flip, random rotation (±15°), ImageNet normalization
 - **Validation/Testing**: Resize to 224×224 (or 256 with center crop), ImageNet normalization
 
@@ -422,7 +415,6 @@ Both ResNet50 and ViT models apply the following transformations:
 ### 1. TRANSRESUNET Workflow
 
 1. **Configure Paths:** Open `TransResUnet/train.py` and set dataset paths to `./processed_segmentation_data/segmentation_dataset/`.
-
 2. **Train & Evaluate:**
 
    ```bash
@@ -443,9 +435,7 @@ Both ResNet50 and ViT models apply the following transformations:
    python preprocess_data.py
    cd ..
    ```
-
 2. **Download & Place Weights:** Download `medsam_vit_b.pth` and place it in `MedSAM/workdir/MedSAM/`.
-
 3. **Fine-tune & Evaluate:**
 
    ```bash
@@ -466,7 +456,6 @@ Both ResNet50 and ViT models apply the following transformations:
    conda activate nnunetv2_env
    nnUNetv2_train 800 3d_fullres 0
    ```
-
 2. **Model Inference (Prediction):**
 
    ```bash
@@ -474,7 +463,7 @@ Both ResNet50 and ViT models apply the following transformations:
    OUTPUT_PREDICTION_DIR="./OUTPUT_FOLDER/nnunetv2_predictions"
    NNUNET_RAW_TASK_DIR="${nnUNet_raw}/Dataset800_AS-OCT"
    mkdir -p ${OUTPUT_PREDICTION_DIR}
-   
+
    nnUNetv2_predict \
        -i "${NNUNET_RAW_TASK_DIR}/imagesTs" \
        -o "${OUTPUT_PREDICTION_DIR}" \
@@ -497,7 +486,6 @@ Both ResNet50 and ViT models apply the following transformations:
    python train_asoct_pose.py
    cd ..
    ```
-
 2. **Evaluate the Model:**
 
    ```bash
@@ -508,7 +496,6 @@ Both ResNet50 and ViT models apply the following transformations:
    python visualize_prediction_errors.py
    cd ..
    ```
-
 3. **Predict with the Model:**
 
    ```bash
@@ -517,6 +504,8 @@ Both ResNet50 and ViT models apply the following transformations:
    python predict_asoct_pose.py
    cd ..
    ```
+
+<<<<<<< HEAD
 
 ### 5. Classification Workflow
 
@@ -527,11 +516,13 @@ Both ResNet50 and ViT models apply the following transformations:
 1. **Train ResNet50 Model:**
 
    Open `ResNet50_Classification/train.py` and modify the `DATA_ROOT` variable to your dataset path:
+
    ```python
    DATA_ROOT = '/path/to/your/raw_data/as-oct dataset'
    ```
 
    Then train the model:
+
    ```bash
    conda activate as-oct-cls
    cd ResNet50_Classification/
@@ -540,11 +531,11 @@ Both ResNet50 and ViT models apply the following transformations:
    ```
 
    This will:
+
    - Automatically split the dataset (70% train, 15% validation, 15% test)
    - Train ResNet50 with ImageNet pre-trained weights
    - Save the best model to `pth/asoct/best_model.pth`
    - Save test set paths to `pth/asoct/test_paths.txt`
-
 2. **Evaluate ResNet50 Model:**
 
    ```bash
@@ -555,19 +546,21 @@ Both ResNet50 and ViT models apply the following transformations:
    ```
 
    This will:
+
    - Load the best trained model
    - Evaluate on the test set
    - Generate confusion matrix, ROC curves, and PR curves
    - Save visualization results to `results/asoct/`
-
 3. **Train and Test Vision Transformer (ViT):**
 
    Open `ViT_Classification/vit.py` and modify the `data_root` variable:
+
    ```python
    data_root = '/path/to/your/raw_data/as-oct dataset'
    ```
 
    Then run:
+
    ```bash
    conda activate as-oct-cls
    cd ViT_Classification/
@@ -576,10 +569,42 @@ Both ResNet50 and ViT models apply the following transformations:
    ```
 
    This script performs both training and testing:
+
    - Trains ViT-Small model with ImageNet pre-trained weights
    - Automatically splits the dataset (70% train, 15% validation, 15% test)
    - Saves the best model to `best_model.pt`
    - Evaluates on test set and prints classification report
+     =======
+
+#### 巩膜突定位权重下载
+
+从百度网盘下载 `AS-OCT/yolov11l/best.pt`（YOLO11l-pose，Ultralytics 8.3.226，用于左右巩膜突定位）。**下载链接：[AS-OCT](https://pan.baidu.com/s/181n5k-KSRUKdenJ6_y7WaA)，提取码：`1234`。**
+
+按前文原有说明安装环境后，将权重和待预测图片放到原脚本默认目录（目录不存在时自行创建）：
+
+```text
+yoloV11-SS-Detection/runs/pose/asoct_yolo11l_4class/weights/best.pt
+yoloV11-SS-Detection/datasets/ASOCT_YOLO/images/val/  ← 待预测图片
+```
+
+然后在仓库根目录执行，无需重新训练：
+
+```bash
+cd yoloV11-SS-Detection
+python predict_asoct_pose.py
+```
+
+预测参数沿用原脚本：`imgsz=640`、`conf=0.25`、`iou=0.7`，自动选择 GPU 或 CPU；结果保存在 `runs/pose/predict/`。如需使用其他图片路径，修改原脚本中的 `source` 即可。
+
+对应的[数据集配置文件](yoloV11-SS-Detection/datasets/asoct-pose-4class.yaml)随仓库提供；仅预测时无需使用该文件。
+
+>>>>>>> cb17639d86d64e0787cae52f4c6dee229063e862
+>>>>>>>
+>>>>>>
+>>>>>
+>>>>
+>>>
+>>
 
 ## Evaluation
 
@@ -588,6 +613,7 @@ For **segmentation models**, performance is measured using **Intersection over U
 For **YOLOv11 Pose detection**, evaluation metrics include **mAP50-95 (pose)**, **Mean Pixel Distance (MPD)**, and **Percentage of Correct Keypoints (PCK)**.
 
 For **classification models**, performance is evaluated using multiple metrics to provide comprehensive assessment:
+
 - **Accuracy**: Overall classification correctness
 - **Precision**: Per-class and weighted average precision
 - **Recall**: Per-class and weighted average recall
@@ -602,28 +628,28 @@ The classification evaluation scripts generate detailed reports and visualizatio
 
 ### Segmentation Results
 
-| Anatomical Structure | Method       | Dice (%)            | IoU (%)             |
-| :------------------- | :----------- | :------------------ | :------------------ |
-| **Anterior Chamber** | nnUNet       | 0.9878 ± 0.0067     | 0.9760 ± 0.0126     |
-|                      | TransResUNet | 0.9764 ± 0.0082     | **0.9880 ± 0.0042** |
-|                      | MedSAM       | 0.9598 ± 0.0462     | 0.9788 ± 0.0294     |
-| **Lens**             | nnUNet       | 0.9454 ± 0.0071     | 0.9038 ± 0.0088     |
-|                      | TransResUNet | **0.9776 ± 0.0078** | **0.9886 ± 0.0040** |
-|                      | MedSAM       | 0.6783 ± 0.3032     | 0.7536 ± 0.3052     |
-| **Nucleus**          | nnUNet       | 0.9338 ± 0.0099     | 0.8889 ± 0.0200     |
-|                      | TransResUNet | **0.9375 ± 0.0325** | **0.9674 ± 0.0178** |
-|                      | MedSAM       | 0.8907 ± 0.0567     | 0.9412 ± 0.0336     |
-| **Left Iris**        | nnUNet       | 0.7623 ± 0.0935     | 0.6914 ± 0.0952     |
-|                      | TransResUNet | 0.8264 ± 0.0547     | 0.9039 ± 0.0341     |
-|                      | MedSAM       | **0.8552 ± 0.0437** | **0.9213 ± 0.0262** |
-| **Right Iris**       | nnUNet       | **0.8517 ± 0.0230** | 0.7657 ± 0.0345     |
-|                      | TransResUNet | 0.7426 ± 0.0611     | 0.8509 ± 0.0418     |
-|                      | MedSAM       | 0.8455 ± 0.0420     | **0.9157 ± 0.0253** |
+| Anatomical Structure       | Method       | Dice (%)                   | IoU (%)                    |
+| :------------------------- | :----------- | :------------------------- | :------------------------- |
+| **Anterior Chamber** | nnUNet       | 0.9878 ± 0.0067           | 0.9760 ± 0.0126           |
+|                            | TransResUNet | 0.9764 ± 0.0082           | **0.9880 ± 0.0042** |
+|                            | MedSAM       | 0.9598 ± 0.0462           | 0.9788 ± 0.0294           |
+| **Lens**             | nnUNet       | 0.9454 ± 0.0071           | 0.9038 ± 0.0088           |
+|                            | TransResUNet | **0.9776 ± 0.0078** | **0.9886 ± 0.0040** |
+|                            | MedSAM       | 0.6783 ± 0.3032           | 0.7536 ± 0.3052           |
+| **Nucleus**          | nnUNet       | 0.9338 ± 0.0099           | 0.8889 ± 0.0200           |
+|                            | TransResUNet | **0.9375 ± 0.0325** | **0.9674 ± 0.0178** |
+|                            | MedSAM       | 0.8907 ± 0.0567           | 0.9412 ± 0.0336           |
+| **Left Iris**        | nnUNet       | 0.7623 ± 0.0935           | 0.6914 ± 0.0952           |
+|                            | TransResUNet | 0.8264 ± 0.0547           | 0.9039 ± 0.0341           |
+|                            | MedSAM       | **0.8552 ± 0.0437** | **0.9213 ± 0.0262** |
+| **Right Iris**       | nnUNet       | **0.8517 ± 0.0230** | 0.7657 ± 0.0345           |
+|                            | TransResUNet | 0.7426 ± 0.0611           | 0.8509 ± 0.0418           |
+|                            | MedSAM       | 0.8455 ± 0.0420           | **0.9157 ± 0.0253** |
 
 ### Scleral Spur Localization Results
 
-| Site  | MPD (px)       | Median (px) | PCK@5px | PCK@10px | PCK@20px | PCK@50px |
-| :---- | :------------- | :---------- | :------ | :------- | :------- | :------- |
+| Site  | MPD (px)        | Median (px) | PCK@5px | PCK@10px | PCK@20px | PCK@50px |
+| :---- | :-------------- | :---------- | :------ | :------- | :------- | :------- |
 | Left  | 41.39 ± 23.47  | 39.53       | 1.4%    | 3.5%     | 32.5%    | 69.2%    |
 | Right | 34.53 ± 110.50 | 22.98       | 6.2%    | 16.0%    | 41.7%    | 90.3%    |
 
@@ -647,12 +673,12 @@ The classification models were evaluated on the test set (15% of 848 images) usi
 
 **Per-Class Performance (ViT-Small):**
 
-| Class              | Precision (%) | Recall (%) | F1-Score (%) | Support |
-| :----------------- | :------------ | :--------- | :----------- | :------ |
-| Normal             | TBD           | TBD        | TBD          | TBD     |
-| Cataract           | TBD           | TBD        | TBD          | TBD     |
-| Glaucoma           | TBD           | TBD        | TBD          | TBD     |
-| Glaucoma_Cataract  | TBD           | TBD        | TBD          | TBD     |
+| Class             | Precision (%) | Recall (%) | F1-Score (%) | Support |
+| :---------------- | :------------ | :--------- | :----------- | :------ |
+| Normal            | TBD           | TBD        | TBD          | TBD     |
+| Cataract          | TBD           | TBD        | TBD          | TBD     |
+| Glaucoma          | TBD           | TBD        | TBD          | TBD     |
+| Glaucoma_Cataract | TBD           | TBD        | TBD          | TBD     |
 
 **Note:** TBD = To Be Determined. Please run the training and evaluation scripts to populate these results with your experimental data.
 
@@ -663,7 +689,6 @@ This project integrates and builds upon several excellent open-source projects. 
 * **TRANSRESUNET:**
 
   * GitHub Repository: [https://github.com/nikhilroxtomar/TransResUNet](https://github.com/nikhilroxtomar/TransResUNet)
-
   * Original Paper:
 
     ```bibtex
@@ -676,11 +701,9 @@ This project integrates and builds upon several excellent open-source projects. 
           primaryClass={eess.IV}
     }
     ```
-
 * **MEDSAM:**
 
   * GitHub Repository: [https://github.com/bowang-lab/MedSAM](https://github.com/bowang-lab/MedSAM)
-
   * Original Paper:
 
     ```bibtex
@@ -691,11 +714,9 @@ This project integrates and builds upon several excellent open-source projects. 
       year={2023}
     }
     ```
-
 * **nnUNetv2:**
 
   * GitHub Repository: [https://github.com/MIC-DKFZ/nnUNet](https://github.com/MIC-DKFZ/nnUNet)
-
   * Original Paper:
 
     ```bibtex
@@ -710,55 +731,58 @@ This project integrates and builds upon several excellent open-source projects. 
       publisher={Nature Publishing Group}
     }
     ```
-
 * **YOLOv11 Pose (Ultralytics):**
 
-  *   GitHub Repository: [https://github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)
-  *   (Please refer to their official documentation for the most up-to-date citation guidelines)
-
+  * GitHub Repository: [https://github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics)
+  * (Please refer to their official documentation for the most up-to-date citation guidelines)
 * **PyTorch Image Models (timm):**
 
-  *   GitHub Repository: [https://github.com/huggingface/pytorch-image-models](https://github.com/huggingface/pytorch-image-models)
-  *   Used for Vision Transformer (ViT) implementation
-
+  * GitHub Repository: [https://github.com/huggingface/pytorch-image-models](https://github.com/huggingface/pytorch-image-models)
+  * Used for Vision Transformer (ViT) implementation
 * **ResNet:**
 
-  *   Original Paper:
+  * Original Paper:
 
-    ```bibtex
-    @inproceedings{he2016deep,
-      title={Deep residual learning for image recognition},
-      author={He, Kaiming and Zhang, Xiangyu and Ren, Shaoqing and Sun, Jian},
-      booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
-      pages={770--778},
-      year={2016}
-    }
-    ```
-
+  ```bibtex
+  @inproceedings{he2016deep,
+    title={Deep residual learning for image recognition},
+    author={He, Kaiming and Zhang, Xiangyu and Ren, Shaoqing and Sun, Jian},
+    booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+    pages={770--778},
+    year={2016}
+  }
+  ```
 * **Vision Transformer (ViT):**
 
-  *   Original Paper:
+  * Original Paper:
 
-    ```bibtex
-    @inproceedings{dosovitskiy2021an,
-      title={An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale},
-      author={Dosovitskiy, Alexey and Beyer, Lucas and Kolesnikov, Alexander and Weissenborn, Dirk and Zhai, Xiaohua and Unterthiner, Thomas and Dehghani, Mostafa and Minderer, Matthias and Heigold, Georg and Gelly, Sylvain and others},
-      booktitle={International Conference on Learning Representations},
-      year={2021}
-    }
-    ```
+  ```bibtex
+  @inproceedings{dosovitskiy2021an,
+    title={An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale},
+    author={Dosovitskiy, Alexey and Beyer, Lucas and Kolesnikov, Alexander and Weissenborn, Dirk and Zhai, Xiaohua and Unterthiner, Thomas and Dehghani, Mostafa and Minderer, Matthias and Heigold, Georg and Gelly, Sylvain and others},
+    booktitle={International Conference on Learning Representations},
+    year={2021}
+  }
+  ```
 
 **Our Paper:**
 If you use this repository in your work, please also cite our paper:
 
 ```bibtex
-@article{your_paper_citation,
-  title={An Annotated AS-OCT Dataset of Anterior Segment Structures for Multi-Disease Analysis and Ophthalmic Biometry},
-  author={Your Name and Co-authors},
-  journal={Journal Name},
-  year={Year}
+@article{zhao2026asoct,
+  title={{AS-OCT} dataset with anatomical structure segmentation and scleral spur localization in cataract and glaucoma},
+  author={Zhao, Jiongning and Fang, Huihui and Yang, Yuetong and Fu, Xinyu and
+          Deng, Jingru and Yu, Jinghe and Yan, Xingying and Hu, Xinya and
+          Wang, Xiaoqing and Hu, Yuting and Gong, Di and Zhang, Zhe and
+          Chi, Wei and Yang, Weihua and Xu, Yanwu},
+  journal={Scientific Data},
+  year={2026},
+  doi={10.1038/s41597-026-08315-8},
+  url={https://doi.org/10.1038/s41597-026-08315-8}
 }
 ```
+
+Jiongning Zhao and Huihui Fang contributed equally to this work.
 
 ## License
 
